@@ -147,9 +147,9 @@ function App() {
             <Heart size={36} color="var(--color-gold)" fill="var(--color-gold)" />
           </div>
 
-          <h1 className="title-glow" style={{
+          <h1 className="title-glow intro-title" style={{
             fontFamily: 'var(--font-serif)',
-            fontSize: window.innerWidth > 768 ? '3.8rem' : '2.4rem',
+            fontSize: '3.8rem',
             lineHeight: '1.2',
             fontWeight: 500,
             letterSpacing: '0.06em'
@@ -164,9 +164,9 @@ function App() {
             opacity: 0.6
           }} />
 
-          <p style={{
+          <p className="intro-text" style={{
             color: 'var(--color-secondary)',
-            fontSize: window.innerWidth > 768 ? '1.15rem' : '0.98rem',
+            fontSize: '1.15rem',
             lineHeight: '1.9',
             fontWeight: 300,
             textShadow: '0 2px 10px rgba(0,0,0,0.6)',
@@ -179,7 +179,7 @@ function App() {
 
           <button
             onClick={handleEnterMemorial}
-            className="btn-gold pulse-gold-ring"
+            className="btn-gold pulse-gold-ring intro-btn"
             style={{
               padding: '18px 40px',
               fontSize: '1.05rem',
@@ -229,7 +229,7 @@ function App() {
       position: 'relative'
     }}>
       {/* 1. HEADER */}
-      <header className="glass-panel" style={{
+      <header className="glass-panel app-header" style={{
         position: 'absolute',
         top: '16px',
         left: '16px',
@@ -243,10 +243,10 @@ function App() {
         borderRadius: '20px'
       }}>
         {/* Brand/Title */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div className="header-brand" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Heart size={20} color="var(--color-gold)" fill="var(--color-gold)" />
-          <h1 style={{
-            fontSize: window.innerWidth > 768 ? '1.4rem' : '1.1rem',
+          <h1 className="header-brand-title" style={{
+            fontSize: '1.4rem',
             fontFamily: 'var(--font-serif)',
             fontWeight: 600,
             margin: 0,
@@ -257,7 +257,7 @@ function App() {
         </div>
 
         {/* View Mode Toggle Controls */}
-        <div className="glass-panel" style={{
+        <div className="glass-panel header-view-toggle" style={{
           display: 'flex',
           padding: '4px',
           borderRadius: '9999px',
@@ -301,7 +301,7 @@ function App() {
         </div>
 
         {/* Action Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           {/* Audio toggle button */}
           <button
             onClick={handleToggleAudio}
@@ -323,20 +323,18 @@ function App() {
             )}
           </button>
 
-          {/* Share memory trigger button */}
+          {/* Share memory trigger button (hidden on mobile, uses FAB instead) */}
           <button
             onClick={() => setIsUploadOpen(true)}
-            className="btn-gold pulse-gold-ring"
+            className="btn-gold pulse-gold-ring mobile-hide"
             style={{
-              padding: window.innerWidth > 768 ? '10px 20px' : '10px',
-              borderRadius: window.innerWidth > 768 ? '9999px' : '50%',
-              width: window.innerWidth > 768 ? 'auto' : '42px',
-              height: window.innerWidth > 768 ? 'auto' : '42px',
+              padding: '10px 20px',
+              borderRadius: '9999px',
               justifyContent: 'center'
             }}
           >
             <Sparkles size={16} />
-            {window.innerWidth > 768 && <span>Share a Memory</span>}
+            <span>Share a Memory</span>
           </button>
         </div>
       </header>

@@ -31,7 +31,7 @@ export const Timeline: React.FC<TimelineProps> = ({
   };
 
   return (
-    <div style={{
+    <div className="timeline-container" style={{
       maxWidth: '1200px',
       margin: '0 auto',
       padding: '40px 24px 80px',
@@ -40,11 +40,11 @@ export const Timeline: React.FC<TimelineProps> = ({
       gap: '30px'
     }}>
       {/* Search Header */}
-      <div style={{
+      <div className="timeline-header" style={{
         display: 'flex',
-        flexDirection: window.innerWidth > 768 ? 'row' : 'column',
+        flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: window.innerWidth > 768 ? 'center' : 'stretch',
+        alignItems: 'center',
         gap: '20px',
         borderBottom: '1px solid var(--border-glass)',
         paddingBottom: '20px'
@@ -68,9 +68,10 @@ export const Timeline: React.FC<TimelineProps> = ({
         </div>
 
         {/* Search Bar */}
-        <div style={{
+        <div className="timeline-search-box" style={{
           position: 'relative',
-          maxWidth: window.innerWidth > 768 ? '320px' : '100%'
+          width: '100%',
+          maxWidth: '320px'
         }}>
           <Search 
             size={16} 
@@ -100,7 +101,7 @@ export const Timeline: React.FC<TimelineProps> = ({
 
       {/* Grid Container */}
       {filteredMemories.length > 0 ? (
-        <div style={{
+        <div className="timeline-grid" style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
           gap: '30px',

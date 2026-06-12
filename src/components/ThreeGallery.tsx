@@ -44,6 +44,8 @@ export const ThreeGallery: React.FC<ThreeGalleryProps> = ({
   const rotationTarget = useRef<{ x: number, y: number }>({ x: 0, y: 0 });
   const rotationCurrent = useRef<{ x: number, y: number }>({ x: 0, y: 0 });
   const autoRotateTimer = useRef<number>(0);
+  const clickStartPos = useRef<{ x: number, y: number }>({ x: 0, y: 0 });
+  const hasDragged = useRef<boolean>(false);
 
   // Loading state for assets
   const [loadingText, setLoadingText] = useState<string>('Creating 3D Universe...');
@@ -275,6 +277,8 @@ export const ThreeGallery: React.FC<ThreeGalleryProps> = ({
     // --- 8. DRAG EVENTS & MOUSE MOVEMENT ---
     const onMouseDown = (e: MouseEvent) => {
       isDragging.current = true;
+      hasDragged.current = false;
+      clickStartPos.current = { x: e.clientX, y: e.clientY };
       dragStart.current = { x: e.clientX, y: e.clientY };
       autoRotateTimer.current = Date.now() + 8000; // Suspend auto rotate
     };
@@ -285,6 +289,12 @@ export const ThreeGallery: React.FC<ThreeGalleryProps> = ({
       mouseRef.current.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
       if (!isDragging.current) return;
+      
+      const dx = e.clientX - clickStartPos.current.x;
+      const dy = e.clientY - clickStartPos.current.y;
+      if (dx * dx + dy * dy > 36) {
+        hasDragged.current = true;
+      }
       
       const deltaX = e.clientX - dragStart.current.x;
       const deltaY = e.clientY - dragStart.current.y;
@@ -303,6 +313,8 @@ export const ThreeGallery: React.FC<ThreeGalleryProps> = ({
     const onTouchStart = (e: TouchEvent) => {
       if (e.touches.length !== 1) return;
       isDragging.current = true;
+      hasDragged.current = false;
+      clickStartPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
       dragStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
       autoRotateTimer.current = Date.now() + 8000;
     };
@@ -313,6 +325,12 @@ export const ThreeGallery: React.FC<ThreeGalleryProps> = ({
       mouseRef.current.y = -((e.touches[0].clientY - rect.top) / rect.height) * 2 + 1;
 
       if (!isDragging.current) return;
+      
+      const dx = e.touches[0].clientX - clickStartPos.current.x;
+      const dy = e.touches[0].clientY - clickStartPos.current.y;
+      if (dx * dx + dy * dy > 36) {
+        hasDragged.current = true;
+      }
       
       const deltaX = e.touches[0].clientX - dragStart.current.x;
       const deltaY = e.touches[0].clientY - dragStart.current.y;
@@ -329,6 +347,11 @@ export const ThreeGallery: React.FC<ThreeGalleryProps> = ({
     };
 
     const onClick = () => {
+      if (hasDragged.current) {
+        hasDragged.current = false;
+        return;
+      }
+
       raycasterRef.current.setFromCamera(mouseRef.current, camera);
       if (!framesGroupRef.current) return;
 

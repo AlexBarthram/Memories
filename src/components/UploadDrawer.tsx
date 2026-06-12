@@ -199,31 +199,13 @@ export const UploadDrawer: React.FC<UploadDrawerProps> = ({
 
       {/* Slide-out Drawer Panel */}
       <div 
-        className="glass-panel-gold"
+        className="glass-panel-gold upload-drawer"
         style={{
-          position: 'fixed',
-          top: window.innerWidth > 768 ? 0 : 'auto',
-          bottom: 0,
-          right: 0,
-          left: window.innerWidth > 768 ? 'auto' : 0,
-          width: window.innerWidth > 768 ? '480px' : '100%',
-          height: window.innerWidth > 768 ? '100vh' : '90vh',
-          zIndex: 1001,
-          borderRadius: window.innerWidth > 768 ? '24px 0 0 24px' : '24px 24px 0 0',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '-10px 0 40px rgba(0,0,0,0.7)',
-          overflow: 'hidden',
-          animation: 'slideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+          overflow: 'hidden'
         }}
       >
-        {/* CSS Animation declaration */}
-        <style dangerouslySetInnerHTML={{__html: `
-          @keyframes slideIn {
-            from { transform: ${window.innerWidth > 768 ? 'translateX(100%)' : 'translateY(100%)'}; }
-            to { transform: ${window.innerWidth > 768 ? 'translateX(0)' : 'translateY(0)'}; }
-          }
-        `}} />
 
         {/* Header */}
         <div style={{

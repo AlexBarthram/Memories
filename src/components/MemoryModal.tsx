@@ -98,7 +98,7 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
 
       {/* Modal Container */}
       <div 
-        className="glass-panel"
+        className="glass-panel memory-modal-dialog"
         style={{
           position: 'fixed',
           top: '50%',
@@ -109,7 +109,7 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
           maxHeight: '85vh',
           zIndex: 1001,
           display: 'flex',
-          flexDirection: window.innerWidth > 768 ? 'row' : 'column',
+          flexDirection: 'row',
           boxShadow: '0 20px 50px rgba(0,0,0,0.8)',
           overflow: 'hidden',
           border: '1px solid var(--border-glass-gold)',
@@ -124,9 +124,9 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
         `}} />
 
         {/* Media Block (Left / Top) */}
-        <div style={{
-          flex: window.innerWidth > 768 ? '1.2' : 'none',
-          height: window.innerWidth > 768 ? 'auto' : '35vh',
+        <div className="memory-modal-media" style={{
+          flex: 1.2,
+          height: 'auto',
           background: '#04050a',
           position: 'relative',
           display: 'flex',
@@ -237,30 +237,28 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
           )}
 
           {/* Close button on Mobile overlay */}
-          {window.innerWidth <= 768 && (
-            <button 
-              onClick={onClose}
-              className="btn-icon"
-              style={{
-                position: 'absolute',
-                top: '12px',
-                right: '12px',
-                background: 'rgba(0,0,0,0.5)',
-                border: 'none',
-                zIndex: 10
-              }}
-            >
-              <X size={18} />
-            </button>
-          )}
+          <button 
+            onClick={onClose}
+            className="btn-icon desktop-hide"
+            style={{
+              position: 'absolute',
+              top: '12px',
+              right: '12px',
+              background: 'rgba(0,0,0,0.5)',
+              border: 'none',
+              zIndex: 10
+            }}
+          >
+            <X size={18} />
+          </button>
         </div>
 
         {/* Details & Comments Block (Right / Bottom) */}
-        <div style={{
+        <div className="memory-modal-details" style={{
           flex: '1',
           display: 'flex',
           flexDirection: 'column',
-          height: window.innerWidth > 768 ? '85vh' : '50vh',
+          height: '85vh',
           background: 'rgba(7, 9, 14, 0.4)'
         }}>
           {/* Header */}
@@ -328,15 +326,13 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
               </div>
             </div>
             
-            {window.innerWidth > 768 && (
-              <button 
-                onClick={onClose}
-                className="btn-icon"
-                style={{ background: 'rgba(255,255,255,0.05)', border: 'none' }}
-              >
-                <X size={18} />
-              </button>
-            )}
+            <button 
+              onClick={onClose}
+              className="btn-icon mobile-hide"
+              style={{ background: 'rgba(255,255,255,0.05)', border: 'none' }}
+            >
+              <X size={18} />
+            </button>
           </div>
 
           {/* Scrollable details */}
