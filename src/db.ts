@@ -1,3 +1,5 @@
+import { createClient } from '@supabase/supabase-js';
+
 export interface MemoryComment {
   id: string;
   name: string;
@@ -7,7 +9,7 @@ export interface MemoryComment {
 
 export interface MemoryMedia {
   id: string;
-  blob: Blob;
+  blob?: Blob;
   type: 'image' | 'video';
   url?: string;
 }
@@ -28,6 +30,12 @@ export interface Memory {
   z: number;
   rotationY: number;
 }
+
+// Initialize Supabase Client if env keys are present
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
+export const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
 const DB_NAME = 'EternalRemembranceDB';
 const DB_VERSION = 1;
@@ -50,7 +58,6 @@ function openDB(): Promise<IDBDatabase> {
 }
 
 // Default initial memories (using beautiful royalty-free placeholders or stylized graphics)
-// We will load these if the database is empty.
 const createPlaceholderBlob = (color1: string, color2: string, text: string): Promise<Blob> => {
   return new Promise((resolve) => {
     const canvas = document.createElement('canvas');
@@ -100,17 +107,15 @@ const createPlaceholderBlob = (color1: string, color2: string, text: string): Pr
 };
 
 export async function getMemories(): Promise<Memory[]> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, 'readonly');
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.getAll();
+  // --- SUPABASE PATH ---
+  if (supabase) {
+    const { data, error } = await supabase.from('memories').select('*');
+    if (error) {
+      console.error('Error fetching from Supabase, falling back to IndexedDB:', error);
+    } else {
+      let list = data as any[];
 
-    request.onerror = () => reject(request.error);
-    request.onsuccess = async () => {
-      let list = request.result as Memory[];
-
-      // If empty, initialize with 3 beautiful default placeholder memories
+      // If empty in Supabase, initialize with default memories and upload them
       if (list.length === 0) {
         const defaultMemories: Memory[] = [
           {
@@ -179,7 +184,148 @@ export async function getMemories(): Promise<Memory[]> {
           }
         ];
 
-        // Store them in the database
+        for (const mem of defaultMemories) {
+          const uploadedMedia = [];
+          for (const item of mem.media) {
+            if (item.blob) {
+              const path = `${mem.id}/${item.id}`;
+              const { error: uploadErr } = await supabase.storage.from('memories').upload(path, item.blob, {
+                contentType: 'image/jpeg',
+                cacheControl: '3600',
+                upsert: true
+              });
+              if (uploadErr) {
+                console.error("Upload error for placeholder media:", uploadErr);
+              }
+              const { data: urlData } = supabase.storage.from('memories').getPublicUrl(path);
+              uploadedMedia.push({
+                id: item.id,
+                type: item.type,
+                url: urlData.publicUrl
+              });
+            }
+          }
+
+          const { error: insertErr } = await supabase.from('memories').insert({
+            id: mem.id,
+            name: mem.name,
+            title: mem.title,
+            message: mem.message,
+            media: uploadedMedia,
+            comments: mem.comments,
+            timestamp: mem.timestamp,
+            x: mem.x,
+            y: mem.y,
+            z: mem.z,
+            rotation_y: mem.rotationY
+          });
+
+          if (insertErr) {
+            console.error("Insert error for placeholder memory:", insertErr);
+          }
+        }
+
+        const { data: reloadedData } = await supabase.from('memories').select('*');
+        list = reloadedData || defaultMemories;
+      }
+
+      return list.map(mem => ({
+        id: mem.id,
+        name: mem.name,
+        title: mem.title,
+        message: mem.message,
+        media: mem.media || [],
+        comments: mem.comments || [],
+        timestamp: Number(mem.timestamp),
+        x: Number(mem.x),
+        y: Number(mem.y),
+        z: Number(mem.z),
+        rotationY: Number(mem.rotation_y),
+        mediaUrl: mem.media?.[0]?.url,
+        mediaType: mem.media?.[0]?.type
+      })).sort((a, b) => b.timestamp - a.timestamp);
+    }
+  }
+
+  // --- INDEXEDDB FALLBACK ---
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE_NAME, 'readonly');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.getAll();
+
+    request.onerror = () => reject(request.error);
+    request.onsuccess = async () => {
+      let list = request.result as Memory[];
+
+      if (list.length === 0) {
+        const defaultMemories: Memory[] = [
+          {
+            id: 'placeholder-1',
+            name: 'Mom',
+            title: 'Her Radiant Smile',
+            message: 'Her laughter could fill any room with pure joy. This website is a tribute to her beautiful spirit, which continues to guide us every single day. We miss you more than words can express.',
+            media: [
+              {
+                id: 'media-p1',
+                blob: await createPlaceholderBlob('#0f172a', '#1e1b4b', '“In the night of death, hope sees a star...”'),
+                type: 'image'
+              }
+            ],
+            timestamp: Date.now() - 3600000 * 24 * 3,
+            comments: [
+              {
+                id: 'c1',
+                name: 'Sarah',
+                message: 'This is incredibly beautiful. She had the most pure heart.',
+                timestamp: Date.now() - 3600000 * 24 * 2,
+              }
+            ],
+            x: -4,
+            y: 1,
+            z: -5,
+            rotationY: 0.3,
+          },
+          {
+            id: 'placeholder-2',
+            name: 'Alex (Dad)',
+            title: 'Always in our Hearts',
+            message: 'I remember her dancing in the rain, laughing without a care. That is how I choose to remember her - free, happy, and full of life. Rest in peace, our sweet angel.',
+            media: [
+              {
+                id: 'media-p2',
+                blob: await createPlaceholderBlob('#1e1b4b', '#311042', '“Your life was a blessing, your memory a treasure.”'),
+                type: 'image'
+              }
+            ],
+            timestamp: Date.now() - 3600000 * 24 * 5,
+            comments: [],
+            x: 0,
+            y: 2.5,
+            z: -6,
+            rotationY: 0,
+          },
+          {
+            id: 'placeholder-3',
+            name: 'Emily (Best Friend)',
+            title: 'Shared Laughs & Secret Dreams',
+            message: 'We promised to stay friends forever. Distance or time can never break that bond. I feel your presence in every sunset and every warm breeze. Love you always, bestie.',
+            media: [
+              {
+                id: 'media-p3',
+                blob: await createPlaceholderBlob('#022c22', '#0f172a', '“A friend is someone who knows the song in your heart.”'),
+                type: 'image'
+              }
+            ],
+            timestamp: Date.now() - 3600000 * 24 * 7,
+            comments: [],
+            x: 4,
+            y: 1.2,
+            z: -5,
+            rotationY: -0.3,
+          }
+        ];
+
         const writeTx = db.transaction(STORE_NAME, 'readwrite');
         const writeStore = writeTx.objectStore(STORE_NAME);
         for (const mem of defaultMemories) {
@@ -189,9 +335,7 @@ export async function getMemories(): Promise<Memory[]> {
         list = defaultMemories;
       }
 
-      // Generate object URLs for the Blobs so they can be loaded by Three.js / HTML elements
       const listWithUrls = list.map(mem => {
-        // Run migration for legacy memories without the new media array
         if (!mem.media) {
           mem.media = [];
         }
@@ -205,19 +349,17 @@ export async function getMemories(): Promise<Memory[]> {
 
         const updatedMedia = mem.media.map(item => ({
           ...item,
-          url: URL.createObjectURL(item.blob)
+          url: item.blob ? URL.createObjectURL(item.blob) : item.url
         }));
 
         return {
           ...mem,
           media: updatedMedia,
-          // Maintain compatibility with existing code that references single fields
           mediaUrl: updatedMedia[0]?.url,
           mediaType: updatedMedia[0]?.type
         };
       });
 
-      // Sort by timestamp descending
       listWithUrls.sort((a, b) => b.timestamp - a.timestamp);
       resolve(listWithUrls);
     };
@@ -230,19 +372,64 @@ export async function addMemory(
   message: string,
   files: File[]
 ): Promise<Memory> {
-  const db = await openDB();
-
-  // Create layout positions. We'll distribute them randomly in a 3D sphere/arc in front of the camera
-  // Camera is usually at (0, 0, 8), so we place frames around z = -3 to -8, x = -8 to 8, y = -3 to 4
+  const id = 'mem-' + Math.random().toString(36).substr(2, 9);
   const radius = 6 + Math.random() * 3;
-  const theta = (Math.random() - 0.5) * Math.PI * 0.4; // horizontal spread
-  const phi = (Math.random() - 0.3) * Math.PI * 0.2; // vertical spread
+  const theta = (Math.random() - 0.5) * Math.PI * 0.4;
+  const phi = (Math.random() - 0.3) * Math.PI * 0.2;
 
   const x = radius * Math.sin(theta) * Math.cos(phi);
   const y = radius * Math.sin(phi) + 1.0;
   const z = -radius * Math.cos(theta) * Math.cos(phi);
-  const rotationY = -theta * 0.8; // Face towards camera center
+  const rotationY = -theta * 0.8;
 
+  // --- SUPABASE PATH ---
+  if (supabase) {
+    const mediaItems = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const mediaId = 'media-' + Math.random().toString(36).substr(2, 9) + '-' + i;
+      const path = `${id}/${mediaId}`;
+      const { error: uploadErr } = await supabase.storage.from('memories').upload(path, file, {
+        contentType: file.type,
+        upsert: true
+      });
+      if (uploadErr) throw uploadErr;
+
+      const { data: urlData } = supabase.storage.from('memories').getPublicUrl(path);
+      mediaItems.push({
+        id: mediaId,
+        type: file.type.startsWith('video/') ? 'video' : 'image',
+        url: urlData.publicUrl
+      });
+    }
+
+    const newMemory = {
+      id,
+      name: name || 'Anonymous',
+      title: title || 'A Beautiful Memory',
+      message: message || '',
+      media: mediaItems,
+      comments: [],
+      timestamp: Date.now(),
+      x,
+      y,
+      z,
+      rotation_y: rotationY
+    };
+
+    const { error: insertErr } = await supabase.from('memories').insert(newMemory);
+    if (insertErr) throw insertErr;
+
+    return {
+      ...newMemory,
+      rotationY,
+      mediaUrl: mediaItems[0]?.url,
+      mediaType: mediaItems[0]?.type
+    } as any;
+  }
+
+  // --- INDEXEDDB FALLBACK ---
+  const db = await openDB();
   const mediaItems: MemoryMedia[] = files.map((file, idx) => ({
     id: 'media-' + Math.random().toString(36).substr(2, 9) + '-' + idx,
     blob: file,
@@ -250,7 +437,7 @@ export async function addMemory(
   }));
 
   const newMemory: Memory = {
-    id: 'mem-' + Math.random().toString(36).substr(2, 9),
+    id,
     name: name || 'Anonymous',
     title: title || 'A Beautiful Memory',
     message: message || '',
@@ -272,7 +459,7 @@ export async function addMemory(
     request.onsuccess = () => {
       const mappedMedia = newMemory.media.map(m => ({
         ...m,
-        url: URL.createObjectURL(m.blob)
+        url: m.blob ? URL.createObjectURL(m.blob) : m.url
       }));
       resolve({
         ...newMemory,
@@ -289,8 +476,6 @@ export async function addCommentToMemory(
   commenterName: string,
   commentMessage: string
 ): Promise<MemoryComment> {
-  const db = await openDB();
-
   const comment: MemoryComment = {
     id: 'c-' + Math.random().toString(36).substr(2, 9),
     name: commenterName || 'Friend',
@@ -298,6 +483,22 @@ export async function addCommentToMemory(
     timestamp: Date.now(),
   };
 
+  // --- SUPABASE PATH ---
+  if (supabase) {
+    const { data: memories, error: getErr } = await supabase.from('memories').select('comments').eq('id', memoryId);
+    if (getErr || !memories || memories.length === 0) throw getErr || new Error('Memory not found');
+
+    const currentComments = memories[0].comments || [];
+    const updatedComments = [...currentComments, comment];
+
+    const { error: updateErr } = await supabase.from('memories').update({ comments: updatedComments }).eq('id', memoryId);
+    if (updateErr) throw updateErr;
+
+    return comment;
+  }
+
+  // --- INDEXEDDB FALLBACK ---
+  const db = await openDB();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORE_NAME, 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
@@ -331,8 +532,68 @@ export async function updateMemory(
   existingMediaIdsToKeep: string[],
   newFiles: File[]
 ): Promise<Memory> {
-  const db = await openDB();
+  // --- SUPABASE PATH ---
+  if (supabase) {
+    const { data: memories, error: getErr } = await supabase.from('memories').select('*').eq('id', id);
+    if (getErr || !memories || memories.length === 0) throw getErr || new Error('Memory not found');
 
+    const memory = memories[0];
+    const currentMedia = memory.media || [];
+
+    const mediaToKeep = currentMedia.filter((m: any) => existingMediaIdsToKeep.includes(m.id));
+    const mediaToDelete = currentMedia.filter((m: any) => !existingMediaIdsToKeep.includes(m.id));
+
+    // Delete removed files from storage
+    for (const item of mediaToDelete) {
+      const path = `${id}/${item.id}`;
+      await supabase.storage.from('memories').remove([path]);
+    }
+
+    // Upload new files
+    const newMediaItems = [];
+    for (let i = 0; i < newFiles.length; i++) {
+      const file = newFiles[i];
+      const mediaId = 'media-' + Math.random().toString(36).substr(2, 9) + '-' + i;
+      const path = `${id}/${mediaId}`;
+      const { error: uploadErr } = await supabase.storage.from('memories').upload(path, file, {
+        contentType: file.type,
+        upsert: true
+      });
+      if (uploadErr) throw uploadErr;
+
+      const { data: urlData } = supabase.storage.from('memories').getPublicUrl(path);
+      newMediaItems.push({
+        id: mediaId,
+        type: file.type.startsWith('video/') ? 'video' : 'image',
+        url: urlData.publicUrl
+      });
+    }
+
+    const finalMedia = [...mediaToKeep, ...newMediaItems];
+
+    const { error: updateErr } = await supabase.from('memories').update({
+      name: name || 'Anonymous',
+      title: title || 'A Beautiful Memory',
+      message: message || '',
+      media: finalMedia
+    }).eq('id', id);
+
+    if (updateErr) throw updateErr;
+
+    return {
+      ...memory,
+      name: name || 'Anonymous',
+      title: title || 'A Beautiful Memory',
+      message: message || '',
+      media: finalMedia,
+      rotationY: Number(memory.rotation_y),
+      mediaUrl: finalMedia[0]?.url,
+      mediaType: finalMedia[0]?.type
+    } as any;
+  }
+
+  // --- INDEXEDDB FALLBACK ---
+  const db = await openDB();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORE_NAME, 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
@@ -350,20 +611,16 @@ export async function updateMemory(
       memory.title = title || 'A Beautiful Memory';
       memory.message = message || '';
 
-      // Clean up legacy single media settings if any
       delete memory.mediaBlob;
       delete memory.mediaType;
       delete memory.mediaUrl;
 
-      // Migrate structure if it wasn't migrated in db yet
       if (!memory.media) {
         memory.media = [];
       }
 
-      // Filter existing media to keep
       memory.media = memory.media.filter(m => existingMediaIdsToKeep.includes(m.id));
 
-      // Append new files
       const newMediaItems: MemoryMedia[] = newFiles.map((file, idx) => ({
         id: 'media-' + Math.random().toString(36).substr(2, 9) + '-' + idx,
         blob: file,
@@ -376,7 +633,7 @@ export async function updateMemory(
       updateReq.onsuccess = () => {
         const mappedMedia = memory.media.map(m => ({
           ...m,
-          url: URL.createObjectURL(m.blob)
+          url: m.blob ? URL.createObjectURL(m.blob) : m.url
         }));
         resolve({
           ...memory,
@@ -390,6 +647,23 @@ export async function updateMemory(
 }
 
 export async function deleteMemory(id: string): Promise<void> {
+  // --- SUPABASE PATH ---
+  if (supabase) {
+    const { data: memories } = await supabase.from('memories').select('media').eq('id', id);
+    if (memories && memories.length > 0) {
+      const media = memories[0].media || [];
+      const pathsToDelete = media.map((m: any) => `${id}/${m.id}`);
+      if (pathsToDelete.length > 0) {
+        await supabase.storage.from('memories').remove(pathsToDelete);
+      }
+    }
+
+    const { error } = await supabase.from('memories').delete().eq('id', id);
+    if (error) throw error;
+    return;
+  }
+
+  // --- INDEXEDDB FALLBACK ---
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORE_NAME, 'readwrite');
