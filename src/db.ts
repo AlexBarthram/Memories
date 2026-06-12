@@ -106,9 +106,100 @@ const createPlaceholderBlob = (color1: string, color2: string, text: string): Pr
   });
 };
 
+export async function migrateLocalMemoriesToSupabase(): Promise<void> {
+  if (!supabase) return;
+
+  try {
+    const db = await openDB();
+    const localMemories = await new Promise<Memory[]>((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, 'readonly');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.getAll();
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result || []);
+    });
+
+    const userMemories = localMemories.filter(m => m.id && !m.id.startsWith('placeholder-'));
+    if (userMemories.length === 0) return;
+
+    console.log(`Found ${userMemories.length} local memories to migrate to Supabase...`);
+
+    for (const mem of userMemories) {
+      // Check if already in Supabase
+      const { data: existing } = await supabase.from('memories').select('id').eq('id', mem.id).maybeSingle();
+      if (existing) {
+        // Delete from local IndexedDB
+        const deleteTx = db.transaction(STORE_NAME, 'readwrite');
+        deleteTx.objectStore(STORE_NAME).delete(mem.id);
+        continue;
+      }
+
+      const uploadedMedia = [];
+      const mediaList = mem.media || [];
+      if (mem.mediaBlob && mediaList.length === 0) {
+        mediaList.push({
+          id: 'media-legacy-' + mem.id,
+          blob: mem.mediaBlob,
+          type: mem.mediaType || 'image'
+        });
+      }
+
+      for (const item of mediaList) {
+        if (item.blob) {
+          const path = `${mem.id}/${item.id}`;
+          const { error: uploadErr } = await supabase.storage.from('memories').upload(path, item.blob, {
+            contentType: item.blob.type || (item.type === 'video' ? 'video/mp4' : 'image/jpeg'),
+            upsert: true
+          });
+          if (uploadErr) {
+            console.error("Migration upload error:", uploadErr);
+            continue;
+          }
+          const { data: urlData } = supabase.storage.from('memories').getPublicUrl(path);
+          uploadedMedia.push({
+            id: item.id,
+            type: item.type,
+            url: urlData.publicUrl
+          });
+        } else if (item.url) {
+          uploadedMedia.push(item);
+        }
+      }
+
+      const { error: insertErr } = await supabase.from('memories').insert({
+        id: mem.id,
+        name: mem.name || 'Anonymous',
+        title: mem.title || 'A Beautiful Memory',
+        message: mem.message || '',
+        media: uploadedMedia,
+        comments: mem.comments || [],
+        timestamp: mem.timestamp,
+        x: mem.x,
+        y: mem.y,
+        z: mem.z,
+        rotation_y: mem.rotationY || 0
+      });
+
+      if (insertErr) {
+        console.error("Migration database insert error:", insertErr);
+      } else {
+        console.log(`Successfully migrated local memory ${mem.id} to Supabase.`);
+        // Delete from local IndexedDB
+        const deleteTx = db.transaction(STORE_NAME, 'readwrite');
+        deleteTx.objectStore(STORE_NAME).delete(mem.id);
+      }
+    }
+  } catch (err) {
+    console.error("Migration failed:", err);
+  }
+}
+
 export async function getMemories(): Promise<Memory[]> {
   // --- SUPABASE PATH ---
   if (supabase) {
+    // Start migration in background
+    migrateLocalMemoriesToSupabase().catch(console.error);
+
     const { data, error } = await supabase.from('memories').select('*');
     if (error) {
       console.error('Error fetching from Supabase, falling back to IndexedDB:', error);
