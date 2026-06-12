@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Heart, Volume2, VolumeX, Sparkles, Grid, Orbit } from 'lucide-react';
+import { Heart, Volume2, VolumeX, Sparkles, Orbit, Globe, LayoutGrid, List } from 'lucide-react';
 import { getMemories, addMemory, addCommentToMemory, updateMemory, deleteMemory, Memory } from './db';
 import { ambientMusic } from './audio';
 import { ThreeGallery } from './components/ThreeGallery';
@@ -12,7 +12,7 @@ function App() {
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [memoryToEdit, setMemoryToEdit] = useState<Memory | null>(null);
-  const [viewMode, setViewMode] = useState<'3d' | 'timeline'>('3d');
+  const [viewMode, setViewMode] = useState<'3d-spiral' | '3d-globe' | '3d-grid' | 'timeline'>('3d-spiral');
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [isIntroActive, setIsIntroActive] = useState(true);
 
@@ -265,26 +265,63 @@ function App() {
           border: '1px solid rgba(255,255,255,0.05)'
         }}>
           <button
-            onClick={() => setViewMode('3d')}
+            onClick={() => setViewMode('3d-spiral')}
             style={{
-              padding: '6px 16px',
+              padding: '6px 12px',
               fontSize: '0.8rem',
-              background: viewMode === '3d' ? 'var(--color-gold)' : 'transparent',
-              color: viewMode === '3d' ? '#000' : 'var(--color-primary)',
+              background: viewMode === '3d-spiral' ? 'var(--color-gold)' : 'transparent',
+              color: viewMode === '3d-spiral' ? '#000' : 'var(--color-primary)',
               border: 'none',
               borderRadius: '9999px',
-              boxShadow: viewMode === '3d' ? '0 2px 8px rgba(212,175,55,0.3)' : 'none'
+              boxShadow: viewMode === '3d-spiral' ? '0 2px 8px rgba(212,175,55,0.3)' : 'none'
             }}
+            title="3D Spiral Space"
           >
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Orbit size={14} />
-              3D Space
+              <span className="mobile-hide">Spiral</span>
+            </span>
+          </button>
+          <button
+            onClick={() => setViewMode('3d-globe')}
+            style={{
+              padding: '6px 12px',
+              fontSize: '0.8rem',
+              background: viewMode === '3d-globe' ? 'var(--color-gold)' : 'transparent',
+              color: viewMode === '3d-globe' ? '#000' : 'var(--color-primary)',
+              border: 'none',
+              borderRadius: '9999px',
+              boxShadow: viewMode === '3d-globe' ? '0 2px 8px rgba(212,175,55,0.3)' : 'none'
+            }}
+            title="3D Globe Space"
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Globe size={14} />
+              <span className="mobile-hide">Globe</span>
+            </span>
+          </button>
+          <button
+            onClick={() => setViewMode('3d-grid')}
+            style={{
+              padding: '6px 12px',
+              fontSize: '0.8rem',
+              background: viewMode === '3d-grid' ? 'var(--color-gold)' : 'transparent',
+              color: viewMode === '3d-grid' ? '#000' : 'var(--color-primary)',
+              border: 'none',
+              borderRadius: '9999px',
+              boxShadow: viewMode === '3d-grid' ? '0 2px 8px rgba(212,175,55,0.3)' : 'none'
+            }}
+            title="3D Grid Gallery"
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <LayoutGrid size={14} />
+              <span className="mobile-hide">3D Grid</span>
             </span>
           </button>
           <button
             onClick={() => setViewMode('timeline')}
             style={{
-              padding: '6px 16px',
+              padding: '6px 12px',
               fontSize: '0.8rem',
               background: viewMode === 'timeline' ? 'var(--color-gold)' : 'transparent',
               color: viewMode === 'timeline' ? '#000' : 'var(--color-primary)',
@@ -292,10 +329,11 @@ function App() {
               borderRadius: '9999px',
               boxShadow: viewMode === 'timeline' ? '0 2px 8px rgba(212,175,55,0.3)' : 'none'
             }}
+            title="Timeline Feed"
           >
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Grid size={14} />
-              Timeline Feed
+              <List size={14} />
+              <span className="mobile-hide">Feed</span>
             </span>
           </button>
         </div>
@@ -346,11 +384,12 @@ function App() {
         height: '100%',
         position: 'relative'
       }}>
-        {viewMode === '3d' ? (
+        {viewMode !== 'timeline' ? (
           <ThreeGallery
             memories={memories}
             onSelectMemory={setSelectedMemory}
             selectedMemoryId={selectedMemory ? selectedMemory.id : null}
+            layoutMode={viewMode.replace('3d-', '') as 'spiral' | 'globe' | 'grid'}
           />
         ) : (
           <div style={{
@@ -362,7 +401,7 @@ function App() {
           }}>
             <Timeline
               memories={memories}
-              onSelectMemory={setSelectedMemory}
+               onSelectMemory={setSelectedMemory}
             />
           </div>
         )}

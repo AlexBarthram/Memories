@@ -387,6 +387,7 @@ textarea.form-control {
 
   .header-view-toggle button {
     flex: 1 !important;
+    padding: 8px 4px !important;
     text-align: center !important;
     justify-content: center !important;
   }

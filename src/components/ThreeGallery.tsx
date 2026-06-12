@@ -6,12 +6,14 @@ interface ThreeGalleryProps {
   memories: Memory[];
   onSelectMemory: (memory: Memory) => void;
   selectedMemoryId: string | null;
+  layoutMode: 'spiral' | 'globe' | 'grid';
 }
 
 export const ThreeGallery: React.FC<ThreeGalleryProps> = ({
   memories,
   onSelectMemory,
-  selectedMemoryId
+  selectedMemoryId,
+  layoutMode
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -46,9 +48,16 @@ export const ThreeGallery: React.FC<ThreeGalleryProps> = ({
   const autoRotateTimer = useRef<number>(0);
   const clickStartPos = useRef<{ x: number, y: number }>({ x: 0, y: 0 });
   const hasDragged = useRef<boolean>(false);
+  const gridScrollY = useRef<number>(0);
+  const targetGridScrollY = useRef<number>(0);
 
   // Loading state for assets
   const [loadingText, setLoadingText] = useState<string>('Creating 3D Universe...');
+
+  const layoutModeRef = useRef(layoutMode);
+  useEffect(() => {
+    layoutModeRef.current = layoutMode;
+  }, [layoutMode]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -299,8 +308,13 @@ export const ThreeGallery: React.FC<ThreeGalleryProps> = ({
       const deltaX = e.clientX - dragStart.current.x;
       const deltaY = e.clientY - dragStart.current.y;
       
-      rotationTarget.current.x += deltaX * 0.005;
-      rotationTarget.current.y = Math.max(-Math.PI / 4, Math.min(Math.PI / 4, rotationTarget.current.y + deltaY * 0.005));
+      if (layoutModeRef.current === 'grid') {
+        targetGridScrollY.current -= deltaY * 0.015;
+        rotationTarget.current.x = Math.max(-0.25, Math.min(0.25, rotationTarget.current.x + deltaX * 0.0015));
+      } else {
+        rotationTarget.current.x += deltaX * 0.005;
+        rotationTarget.current.y = Math.max(-Math.PI / 4, Math.min(Math.PI / 4, rotationTarget.current.y + deltaY * 0.005));
+      }
 
       dragStart.current = { x: e.clientX, y: e.clientY };
       autoRotateTimer.current = Date.now() + 8000;
@@ -335,8 +349,13 @@ export const ThreeGallery: React.FC<ThreeGalleryProps> = ({
       const deltaX = e.touches[0].clientX - dragStart.current.x;
       const deltaY = e.touches[0].clientY - dragStart.current.y;
 
-      rotationTarget.current.x += deltaX * 0.007;
-      rotationTarget.current.y = Math.max(-Math.PI / 4, Math.min(Math.PI / 4, rotationTarget.current.y + deltaY * 0.007));
+      if (layoutModeRef.current === 'grid') {
+        targetGridScrollY.current -= deltaY * 0.018;
+        rotationTarget.current.x = Math.max(-0.25, Math.min(0.25, rotationTarget.current.x + deltaX * 0.002));
+      } else {
+        rotationTarget.current.x += deltaX * 0.007;
+        rotationTarget.current.y = Math.max(-Math.PI / 4, Math.min(Math.PI / 4, rotationTarget.current.y + deltaY * 0.007));
+      }
 
       dragStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
       autoRotateTimer.current = Date.now() + 8000;
@@ -344,6 +363,13 @@ export const ThreeGallery: React.FC<ThreeGalleryProps> = ({
 
     const onTouchEnd = () => {
       isDragging.current = false;
+    };
+
+    const onWheel = (e: WheelEvent) => {
+      if (layoutModeRef.current === 'grid') {
+        e.preventDefault();
+        targetGridScrollY.current += e.deltaY * 0.005;
+      }
     };
 
     const onClick = () => {
@@ -379,6 +405,7 @@ export const ThreeGallery: React.FC<ThreeGalleryProps> = ({
     dom.addEventListener('touchstart', onTouchStart, { passive: true });
     dom.addEventListener('touchmove', onTouchMove, { passive: true });
     dom.addEventListener('touchend', onTouchEnd);
+    dom.addEventListener('wheel', onWheel, { passive: false });
 
     // --- 9. ANIMATION LOOP ---
     const clock = new THREE.Clock();
@@ -477,9 +504,9 @@ export const ThreeGallery: React.FC<ThreeGalleryProps> = ({
         }
       });
 
-      // Auto-rotation yaw
+      // Auto-rotation yaw (only in spiral/globe layouts)
       const now = Date.now();
-      if (now > autoRotateTimer.current && !isDragging.current && !selectedMemoryId) {
+      if (layoutModeRef.current !== 'grid' && now > autoRotateTimer.current && !isDragging.current && !selectedMemoryId) {
         rotationTarget.current.x += 0.0006;
       }
 
@@ -487,14 +514,65 @@ export const ThreeGallery: React.FC<ThreeGalleryProps> = ({
       rotationCurrent.current.y += (rotationTarget.current.y - rotationCurrent.current.y) * 0.08;
 
       if (framesGroupRef.current) {
-        framesGroupRef.current.rotation.y = rotationCurrent.current.x;
-        framesGroupRef.current.rotation.x = rotationCurrent.current.y;
+        if (layoutModeRef.current === 'grid') {
+          // Scroll limit bounding and smooth lerping
+          const cols = window.innerWidth > 768 ? 3 : 2;
+          const spacingY = 2.4;
+          const rowsCount = Math.ceil(memories.length / cols);
+          const maxScroll = Math.max(0, (rowsCount - 1) * spacingY - 1.0);
+          
+          targetGridScrollY.current = Math.max(0, Math.min(maxScroll, targetGridScrollY.current));
+          gridScrollY.current += (targetGridScrollY.current - gridScrollY.current) * 0.1;
+          
+          framesGroupRef.current.position.y = gridScrollY.current;
+          framesGroupRef.current.position.x = 0;
+          framesGroupRef.current.position.z = 0;
+
+          // Parallax yaw tilt only, no vertical tilt
+          framesGroupRef.current.rotation.y = rotationCurrent.current.x;
+          framesGroupRef.current.rotation.x = 0;
+          framesGroupRef.current.rotation.z = 0;
+        } else {
+          framesGroupRef.current.position.set(0, 0, 0);
+          framesGroupRef.current.rotation.y = rotationCurrent.current.x;
+          framesGroupRef.current.rotation.x = rotationCurrent.current.y;
+          framesGroupRef.current.rotation.z = 0;
+        }
       }
 
+      // Animate floating and rolls dynamically based on current layout mode
       meshesMapRef.current.forEach((frameObj) => {
-        const { group, targetY, floatOffset } = frameObj;
-        group.position.y = targetY + Math.sin(elapsed * 0.8 + floatOffset) * 0.15;
-        group.rotation.z = Math.sin(elapsed * 0.3 + floatOffset) * 0.02;
+        const { group, floatOffset } = frameObj;
+        const u = group.userData;
+        if (u.baseX === undefined) return; // safeguard
+
+        const floatAmt = Math.sin(elapsed * 0.8 + floatOffset) * 0.1;
+        const rollAmt = Math.sin(elapsed * 0.3 + floatOffset) * 0.02;
+
+        if (layoutModeRef.current === 'globe') {
+          const bx = u.baseX;
+          const by = u.baseY;
+          const bz = u.baseZ;
+          const len = Math.sqrt(bx * bx + by * by + bz * bz);
+          if (len > 0) {
+            const nx = bx / len;
+            const ny = by / len;
+            const nz = bz / len;
+            group.position.set(bx + nx * floatAmt, by + ny * floatAmt, bz + nz * floatAmt);
+          } else {
+            group.position.set(bx, by + floatAmt, bz);
+          }
+        } else if (layoutModeRef.current === 'grid') {
+          group.position.set(u.baseX, u.baseY, u.baseZ + floatAmt * 0.5);
+        } else {
+          group.position.set(u.baseX, u.baseY + floatAmt * 1.5, u.baseZ);
+        }
+
+        group.rotation.set(
+          u.baseRotX,
+          u.baseRotY,
+          u.baseRotZ + rollAmt
+        );
       });
 
       // Raycast Hover effects
@@ -553,16 +631,30 @@ export const ThreeGallery: React.FC<ThreeGalleryProps> = ({
         if (activeFrame) {
           const frameWorldPos = new THREE.Vector3();
           activeFrame.group.getWorldPosition(frameWorldPos);
-          const angleY = activeFrame.group.userData.origRotationY + rotationCurrent.current.x;
           
-          const dist = 3.5;
-          targetCamPos.current.set(
-            frameWorldPos.x + Math.sin(angleY) * dist,
-            frameWorldPos.y + 0.2,
-            frameWorldPos.z + Math.cos(angleY) * dist
-          );
-
-          targetLookAt.current.copy(frameWorldPos);
+          if (layoutModeRef.current === 'grid') {
+            targetCamPos.current.set(
+              frameWorldPos.x,
+              frameWorldPos.y,
+              frameWorldPos.z + 3.2
+            );
+            targetLookAt.current.copy(frameWorldPos);
+          } else if (layoutModeRef.current === 'globe') {
+            // Find direction from origin to frame position
+            const normal = frameWorldPos.clone().normalize();
+            targetCamPos.current.copy(frameWorldPos).addScaledVector(normal, 3.2);
+            targetLookAt.current.copy(frameWorldPos);
+          } else {
+            // Spiral layout
+            const angleY = activeFrame.group.userData.origRotationY + rotationCurrent.current.x;
+            const dist = 3.5;
+            targetCamPos.current.set(
+              frameWorldPos.x + Math.sin(angleY) * dist,
+              frameWorldPos.y + 0.2,
+              frameWorldPos.z + Math.cos(angleY) * dist
+            );
+            targetLookAt.current.copy(frameWorldPos);
+          }
         }
       } else {
         targetCamPos.current.set(0, 0, 8);
@@ -598,6 +690,7 @@ export const ThreeGallery: React.FC<ThreeGalleryProps> = ({
       dom.removeEventListener('touchstart', onTouchStart);
       dom.removeEventListener('touchmove', onTouchMove);
       dom.removeEventListener('touchend', onTouchEnd);
+      dom.removeEventListener('wheel', onWheel);
 
       if (rendererRef.current && dom.parentNode) {
         dom.parentNode.removeChild(dom);
@@ -613,10 +706,20 @@ export const ThreeGallery: React.FC<ThreeGalleryProps> = ({
     };
   }, [memories]);
 
-  // Reconcile 3D meshes (Dynamic spiral layout)
+  // Reconcile 3D meshes (Dynamic layout modes)
   useEffect(() => {
     const framesGroup = framesGroupRef.current;
     if (!framesGroup || !sceneRef.current) return;
+
+    // Reset rotations and scroll states when changing layouts
+    rotationTarget.current = { x: 0, y: 0 };
+    rotationCurrent.current = { x: 0, y: 0 };
+    if (framesGroupRef.current) {
+      framesGroupRef.current.rotation.set(0, 0, 0);
+      framesGroupRef.current.position.set(0, 0, 0);
+    }
+    gridScrollY.current = 0;
+    targetGridScrollY.current = 0;
 
     const textureLoader = new THREE.TextureLoader();
 
@@ -632,40 +735,92 @@ export const ThreeGallery: React.FC<ThreeGalleryProps> = ({
       }
     });
 
-    // Render cards using staggered cylindrical spiral
+    // Render cards using dynamic layout formulas
     memories.forEach((memory, index) => {
-      // Calculate coordinates dynamically to prevent overlaps across thousands of photos
-      const cardsPerRow = 6;
-      const row = Math.floor(index / cardsPerRow);
-      const col = index % cardsPerRow;
+      let x = 0;
+      let y = 0;
+      let z = 0;
+      let rotX = 0;
+      let rotY = 0;
+      let rotZ = 0;
 
-      // Radius increases outward to create layered circles
-      const radius = 6.0 + (row * 1.5);
-      
-      // Stagger rows
-      const angle = (col / cardsPerRow) * Math.PI * 2 + (row * 0.4);
-      
-      // Spiral height downwards
-      const y = 1.0 - (row * 1.8) + (Math.sin(col) * 0.25);
-      
-      const x = radius * Math.sin(angle);
-      const z = -radius * Math.cos(angle);
-      const rotationY = -angle;
+      if (layoutMode === 'spiral') {
+        const cardsPerRow = 6;
+        const row = Math.floor(index / cardsPerRow);
+        const col = index % cardsPerRow;
+        const radius = 6.0 + (row * 1.5);
+        const angle = (col / cardsPerRow) * Math.PI * 2 + (row * 0.4);
+        
+        y = 1.0 - (row * 1.8) + (Math.sin(col) * 0.25);
+        x = radius * Math.sin(angle);
+        z = -radius * Math.cos(angle);
+        rotY = -angle;
+      } else if (layoutMode === 'globe') {
+        const N = memories.length;
+        const R = 6.0 + Math.max(0, (N - 10) * 0.1);
+        
+        const phi = Math.acos(1 - 2 * (index + 0.5) / N);
+        const theta = Math.PI * (1 + Math.sqrt(5)) * (index + 0.5);
+        
+        x = R * Math.sin(phi) * Math.cos(theta);
+        y = R * Math.cos(phi);
+        z = R * Math.sin(phi) * Math.sin(theta);
+        
+        // Face outwards from center
+        const target = new THREE.Vector3(2 * x, 2 * y, 2 * z);
+        const tempObj = new THREE.Object3D();
+        tempObj.position.set(x, y, z);
+        tempObj.lookAt(target);
+        rotX = tempObj.rotation.x;
+        rotY = tempObj.rotation.y;
+        rotZ = tempObj.rotation.z;
+      } else if (layoutMode === 'grid') {
+        const cols = window.innerWidth > 768 ? 3 : 2;
+        const spacingX = 3.2;
+        const spacingY = 2.4;
+        const startX = -((cols - 1) * spacingX) / 2;
+        
+        const col = index % cols;
+        const row = Math.floor(index / cols);
+        
+        x = startX + col * spacingX;
+        y = 2.0 - row * spacingY;
+        z = (Math.sin(col * 2.0) + Math.cos(row * 1.5)) * 0.2;
+        
+        rotX = Math.sin(index * 0.5) * 0.08;
+        rotY = Math.cos(index * 0.7) * 0.08;
+        rotZ = Math.sin(index * 1.2) * 0.03;
+      }
 
       if (meshesMapRef.current.has(memory.id)) {
         const entry = meshesMapRef.current.get(memory.id)!;
         entry.targetY = y;
-        entry.group.position.x = x;
-        entry.group.position.z = z;
-        entry.group.rotation.y = rotationY;
-        entry.group.userData.origRotationY = rotationY;
+        entry.group.position.set(x, y, z);
+        entry.group.rotation.set(rotX, rotY, rotZ);
+        entry.group.userData.baseX = x;
+        entry.group.userData.baseY = y;
+        entry.group.userData.baseZ = z;
+        entry.group.userData.baseRotX = rotX;
+        entry.group.userData.baseRotY = rotY;
+        entry.group.userData.baseRotZ = rotZ;
+        entry.group.userData.origRotationY = rotY;
         return;
       }
 
       const frameGroup = new THREE.Group();
       frameGroup.position.set(x, y, z);
-      frameGroup.rotation.y = rotationY;
-      frameGroup.userData = { id: memory.id, origRotationY: rotationY, hoverScale: 1.0 };
+      frameGroup.rotation.set(rotX, rotY, rotZ);
+      frameGroup.userData = { 
+        id: memory.id, 
+        origRotationY: rotY, 
+        hoverScale: 1.0,
+        baseX: x,
+        baseY: y,
+        baseZ: z,
+        baseRotX: rotX,
+        baseRotY: rotY,
+        baseRotZ: rotZ
+      };
 
       const aspect = 1.33;
       const height = 1.8;
@@ -768,7 +923,7 @@ export const ThreeGallery: React.FC<ThreeGalleryProps> = ({
         videoElement: videoEl
       });
     });
-  }, [memories]);
+  }, [memories, layoutMode]);
 
   // Handle video playback on selection
   useEffect(() => {
