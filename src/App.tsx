@@ -12,7 +12,7 @@ function App() {
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [memoryToEdit, setMemoryToEdit] = useState<Memory | null>(null);
-  const [viewMode, setViewMode] = useState<'3d-spiral' | '3d-globe' | '3d-grid' | 'timeline'>('3d-spiral');
+  const [viewMode, setViewMode] = useState<'3d-spiral' | '3d-globe' | '3d-grid' | 'timeline'>('timeline');
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [isIntroActive, setIsIntroActive] = useState(true);
 

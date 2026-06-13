@@ -9,6 +9,32 @@ interface ThreeGalleryProps {
   layoutMode: 'spiral' | 'globe' | 'grid';
 }
 
+const disposeGroup = (group: THREE.Group) => {
+  group.traverse((object) => {
+    if (object instanceof THREE.Mesh || object instanceof THREE.Line) {
+      if (object.geometry) {
+        object.geometry.dispose();
+      }
+      if (object.material) {
+        if (Array.isArray(object.material)) {
+          object.material.forEach((mat) => {
+            if (mat.map) mat.map.dispose();
+            mat.dispose();
+          });
+        } else {
+          if (object.material.map) object.material.map.dispose();
+          object.material.dispose();
+        }
+      }
+    }
+  });
+  if (group.userData && group.userData.textures) {
+    group.userData.textures.forEach((tex: THREE.Texture) => {
+      tex.dispose();
+    });
+  }
+};
+
 export const ThreeGallery: React.FC<ThreeGalleryProps> = ({
   memories,
   onSelectMemory,
@@ -409,9 +435,10 @@ export const ThreeGallery: React.FC<ThreeGalleryProps> = ({
 
     // --- 9. ANIMATION LOOP ---
     const clock = new THREE.Clock();
+    let animationFrameId: number;
 
     const animate = () => {
-      requestAnimationFrame(animate);
+      animationFrameId = requestAnimationFrame(animate);
       const elapsed = clock.getElapsedTime();
 
       // Twinkle Stars
@@ -682,6 +709,8 @@ export const ThreeGallery: React.FC<ThreeGalleryProps> = ({
     window.addEventListener('resize', handleResize);
 
     return () => {
+      cancelAnimationFrame(animationFrameId);
+
       window.removeEventListener('resize', handleResize);
       dom.removeEventListener('mousedown', onMouseDown);
       dom.removeEventListener('mousemove', onMouseMove);
@@ -702,7 +731,24 @@ export const ThreeGallery: React.FC<ThreeGalleryProps> = ({
           val.videoElement.src = '';
           val.videoElement.load();
         }
+        disposeGroup(val.group);
       });
+      meshesMapRef.current.clear();
+
+      starGeometry.dispose();
+      starMaterial.dispose();
+      dustGeometry.dispose();
+      dustMaterial.dispose();
+      petalGeo.dispose();
+      petalMat.dispose();
+      shootingStarMat.dispose();
+      shootingStars.forEach(star => {
+        star.line.geometry.dispose();
+      });
+
+      if (rendererRef.current) {
+        rendererRef.current.dispose();
+      }
     };
   }, [memories]);
 
@@ -730,7 +776,10 @@ export const ThreeGallery: React.FC<ThreeGalleryProps> = ({
         framesGroup.remove(val.group);
         if (val.videoElement) {
           val.videoElement.pause();
+          val.videoElement.src = '';
+          val.videoElement.load();
         }
+        disposeGroup(val.group);
         meshesMapRef.current.delete(id);
       }
     });
