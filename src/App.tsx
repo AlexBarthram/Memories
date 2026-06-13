@@ -154,7 +154,7 @@ function App() {
             fontWeight: 500,
             letterSpacing: '0.06em'
           }}>
-            Alex Berthram
+            Alex Bertram
           </h1>
 
           <div style={{
@@ -172,7 +172,7 @@ function App() {
             textShadow: '0 2px 10px rgba(0,0,0,0.6)',
             letterSpacing: '0.01em'
           }}>
-            Welcome to a peaceful celestial space dedicated to the loving memory of Alex Berthram.
+            Welcome to a peaceful celestial space dedicated to the loving memory of Alex Bertram.
             Here, friends and family share stories, upload photographs and videos, and celebrate
             the beautiful moments we shared. May his light continue to shine in our hearts.
           </p>
@@ -252,7 +252,7 @@ function App() {
             margin: 0,
             letterSpacing: '0.04em'
           }}>
-            Alex Berthram
+            Alex Bertram
           </h1>
         </div>
 
