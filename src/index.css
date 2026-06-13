@@ -462,3 +462,31 @@ textarea.form-control {
   }
 }
 
+/* Timeline grid card performance optimization (Remove backdrop-filter for smooth scroll) */
+.timeline-card {
+  background: rgba(10, 14, 26, 0.96) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.4s ease, box-shadow 0.4s ease !important;
+  transform: translateY(0) scale(1);
+  will-change: transform;
+}
+
+.timeline-card:hover {
+  transform: translateY(-6px) scale(1.01) !important;
+  border-color: var(--color-gold) !important;
+  box-shadow: 0 16px 48px 0 rgba(212, 175, 55, 0.18), 0 0 30px rgba(212, 175, 55, 0.05) !important;
+}
+
+/* Shimmer Loading Animations */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer-bg {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.02) 25%, rgba(212, 175, 55, 0.08) 50%, rgba(255, 255, 255, 0.02) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s infinite linear;
+}
+

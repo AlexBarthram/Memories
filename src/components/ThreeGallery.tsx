@@ -908,12 +908,18 @@ export const ThreeGallery: React.FC<ThreeGalleryProps> = ({
 
       // 3. Media Panel - Extract first media item
       const mediaGeo = new THREE.PlaneGeometry(width, height);
-      let mediaTexture: THREE.Texture;
+      let mediaTexture: THREE.Texture | undefined;
       let videoEl: HTMLVideoElement | undefined;
 
       const firstMedia = memory.media && memory.media[0];
       const isVideo = firstMedia ? firstMedia.type === 'video' : false;
       const mediaUrl = firstMedia ? firstMedia.url : '';
+
+      const mediaMat = new THREE.MeshBasicMaterial({
+        side: THREE.DoubleSide,
+        transparent: !isVideo,
+        opacity: isVideo ? 1 : 0
+      });
 
       if (isVideo && mediaUrl) {
         videoEl = document.createElement('video');
@@ -928,15 +934,24 @@ export const ThreeGallery: React.FC<ThreeGalleryProps> = ({
         mediaTexture.minFilter = THREE.LinearFilter;
         mediaTexture.magFilter = THREE.LinearFilter;
         mediaTexture.format = THREE.RGBAFormat;
-      } else {
-        mediaTexture = textureLoader.load(mediaUrl || '');
+        mediaMat.map = mediaTexture;
+      } else if (mediaUrl) {
+        mediaTexture = textureLoader.load(mediaUrl, () => {
+          let op = 0;
+          const tick = () => {
+            op += 0.08;
+            if (op > 1) op = 1;
+            mediaMat.opacity = op;
+            if (op < 1) {
+              requestAnimationFrame(tick);
+            }
+          };
+          tick();
+        });
         mediaTexture.minFilter = THREE.LinearFilter;
+        mediaMat.map = mediaTexture;
       }
 
-      const mediaMat = new THREE.MeshBasicMaterial({
-        map: mediaTexture,
-        side: THREE.DoubleSide
-      });
       const mediaMesh = new THREE.Mesh(mediaGeo, mediaMat);
       mediaMesh.position.z = 0.01;
       frameGroup.add(mediaMesh);

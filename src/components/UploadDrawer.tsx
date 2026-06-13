@@ -11,6 +11,61 @@ interface UploadDrawerProps {
   memoryToEdit?: Memory | null;
 }
 
+const compressImage = (file: File): Promise<File> => {
+  return new Promise((resolve) => {
+    // Only compress images, keep videos as-is
+    if (!file.type.startsWith('image/')) {
+      resolve(file);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const maxDim = 1200;
+
+        // Scale down if image is too large
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+        }
+
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
+              type: 'image/jpeg',
+              lastModified: Date.now()
+            });
+            resolve(compressedFile);
+          } else {
+            resolve(file);
+          }
+        }, 'image/jpeg', 0.8); // 80% JPEG quality
+      };
+      img.onerror = () => resolve(file);
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
+};
+
 export const UploadDrawer: React.FC<UploadDrawerProps> = ({
   isOpen,
   onClose,
@@ -144,17 +199,20 @@ export const UploadDrawer: React.FC<UploadDrawerProps> = ({
     setError(null);
 
     try {
+      // Compress new images before uploading
+      const compressedFiles = await Promise.all(files.map(file => compressImage(file)));
+
       if (memoryToEdit) {
-        await onEditSuccess(memoryToEdit.id, name.trim(), title.trim(), message.trim(), mediaIdsToKeep, files);
+        await onEditSuccess(memoryToEdit.id, name.trim(), title.trim(), message.trim(), mediaIdsToKeep, compressedFiles);
       } else {
-        if (uploadAsIndividual && files.length > 1) {
+        if (uploadAsIndividual && compressedFiles.length > 1) {
           // Upload each file as an individual memory box!
-          for (let i = 0; i < files.length; i++) {
+          for (let i = 0; i < compressedFiles.length; i++) {
             const fileTitle = title.trim() ? `${title.trim()} (${i + 1})` : `Memory File ${i + 1}`;
-            await onUploadSuccess(name.trim(), fileTitle, message.trim(), [files[i]]);
+            await onUploadSuccess(name.trim(), fileTitle, message.trim(), [compressedFiles[i]]);
           }
         } else {
-          await onUploadSuccess(name.trim(), title.trim(), message.trim(), files);
+          await onUploadSuccess(name.trim(), title.trim(), message.trim(), compressedFiles);
         }
       }
       onClose();

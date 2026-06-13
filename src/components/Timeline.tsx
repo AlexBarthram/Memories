@@ -7,6 +7,71 @@ interface TimelineProps {
   onSelectMemory: (memory: Memory) => void;
 }
 
+const TimelineImage: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
+  const [loaded, setLoaded] = useState(false);
+  return (
+    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+      {!loaded && (
+        <div 
+          className="shimmer-bg" 
+          style={{
+            position: 'absolute',
+            top: 0, left: 0, right: 0, bottom: 0,
+            zIndex: 1
+          }}
+        />
+      )}
+      <img
+        src={src}
+        alt={alt}
+        onLoad={() => setLoaded(true)}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          opacity: loaded ? 1 : 0,
+          transition: 'opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
+          position: 'absolute',
+          top: 0,
+          left: 0
+        }}
+      />
+    </div>
+  );
+};
+
+const TimelineVideo: React.FC<{ src: string }> = ({ src }) => {
+  const [loaded, setLoaded] = useState(false);
+  return (
+    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+      {!loaded && (
+        <div 
+          className="shimmer-bg" 
+          style={{
+            position: 'absolute',
+            top: 0, left: 0, right: 0, bottom: 0,
+            zIndex: 1
+          }}
+        />
+      )}
+      <video
+        src={src}
+        onLoadedData={() => setLoaded(true)}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          opacity: loaded ? 0.7 : 0,
+          transition: 'opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
+          position: 'absolute',
+          top: 0,
+          left: 0
+        }}
+      />
+    </div>
+  );
+};
+
 export const Timeline: React.FC<TimelineProps> = ({
   memories,
   onSelectMemory
@@ -110,12 +175,12 @@ export const Timeline: React.FC<TimelineProps> = ({
             const firstMedia = memory.media && memory.media[0];
             const totalMedia = memory.media ? memory.media.length : 0;
             const isVideo = firstMedia ? firstMedia.type === 'video' : false;
-            const previewUrl = firstMedia ? firstMedia.url : '';
+            const previewUrl = (firstMedia && firstMedia.url) || '';
 
             return (
               <div 
                 key={memory.id}
-                className="glass-panel-gold"
+                className="glass-panel-gold timeline-card"
                 onClick={() => onSelectMemory(memory)}
                 style={{
                   cursor: 'pointer',
@@ -124,15 +189,7 @@ export const Timeline: React.FC<TimelineProps> = ({
                   borderRadius: '16px',
                   overflow: 'hidden',
                   height: '100%',
-                  position: 'relative',
-                  transform: 'scale(1)',
-                  transition: 'all 0.3s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-6px)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
+                  position: 'relative'
                 }}
               >
                 {/* Media Preview Box */}
@@ -149,10 +206,7 @@ export const Timeline: React.FC<TimelineProps> = ({
                 }}>
                   {isVideo ? (
                     <>
-                      <video 
-                        src={previewUrl} 
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.7 }}
-                      />
+                      <TimelineVideo src={previewUrl} />
                       <div style={{
                         position: 'absolute',
                         background: 'rgba(0,0,0,0.6)',
@@ -162,17 +216,14 @@ export const Timeline: React.FC<TimelineProps> = ({
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        border: '1px solid var(--color-gold)'
+                        border: '1px solid var(--color-gold)',
+                        zIndex: 2
                       }}>
                         <Play size={18} color="var(--color-gold)" fill="var(--color-gold)" style={{ marginLeft: '3px' }} />
                       </div>
                     </>
                   ) : (
-                    <img 
-                      src={previewUrl} 
-                      alt={memory.title} 
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
+                    <TimelineImage src={previewUrl} alt={memory.title} />
                   )}
 
                   {/* Multi-photo indicator label */}
