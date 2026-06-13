@@ -952,9 +952,16 @@ export const ThreeGallery: React.FC<ThreeGalleryProps> = ({
         mediaMat.map = mediaTexture;
       }
 
-      const mediaMesh = new THREE.Mesh(mediaGeo, mediaMat);
-      mediaMesh.position.z = 0.01;
-      frameGroup.add(mediaMesh);
+      // Front side media panel
+      const mediaMeshFront = new THREE.Mesh(mediaGeo, mediaMat);
+      mediaMeshFront.position.z = 0.01;
+      frameGroup.add(mediaMeshFront);
+
+      // Back side media panel (visible when cards face away, e.g. on the far side of the globe)
+      const mediaMeshBack = new THREE.Mesh(mediaGeo, mediaMat);
+      mediaMeshBack.position.z = -0.01;
+      mediaMeshBack.rotation.y = Math.PI; // Flip 180 degrees so it faces the back correctly
+      frameGroup.add(mediaMeshBack);
 
       // Preload all image textures for sliding slideshow directly on the 3D card
       const slideTextures: THREE.Texture[] = [];
