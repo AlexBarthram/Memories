@@ -29,6 +29,7 @@ export interface Memory {
   y: number;
   z: number;
   rotationY: number;
+  originalId?: string;
 }
 
 // Initialize Supabase Client if env keys are present
@@ -765,3 +766,27 @@ export async function deleteMemory(id: string): Promise<void> {
     request.onsuccess = () => resolve();
   });
 }
+
+export function splitMemories(memories: Memory[]): Memory[] {
+  const result: Memory[] = [];
+  memories.forEach((mem) => {
+    if (mem.media && mem.media.length > 1) {
+      mem.media.forEach((item, index) => {
+        result.push({
+          ...mem,
+          id: `${mem.id}-split-${item.id}`,
+          originalId: mem.id,
+          media: [item],
+          mediaUrl: item.url,
+          mediaType: item.type,
+          // Subtract a small sequential offset (1 second per image) to preserve their order when sorted
+          timestamp: mem.timestamp - index * 1000,
+        });
+      });
+    } else {
+      result.push(mem);
+    }
+  });
+  return result;
+}
+

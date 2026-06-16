@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Heart, Volume2, VolumeX, Sparkles, Orbit, Globe, LayoutGrid, List } from 'lucide-react';
-import { getMemories, addMemory, addCommentToMemory, updateMemory, deleteMemory, Memory } from './db';
+import { getMemories, addMemory, addCommentToMemory, updateMemory, deleteMemory, Memory, splitMemories } from './db';
 import { ambientMusic } from './audio';
 import { ThreeGallery } from './components/ThreeGallery';
 import { UploadDrawer } from './components/UploadDrawer';
@@ -8,6 +8,7 @@ import { MemoryModal } from './components/MemoryModal';
 import { Timeline } from './components/Timeline';
 
 function App() {
+  const [unsplitMemories, setUnsplitMemories] = useState<Memory[]>([]);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -20,7 +21,9 @@ function App() {
   const loadMemories = async () => {
     try {
       const data = await getMemories();
-      setMemories(data);
+      setUnsplitMemories(data);
+      const splitData = splitMemories(data);
+      setMemories(splitData);
     } catch (err) {
       console.error('Failed to load memories:', err);
     }
@@ -73,15 +76,25 @@ function App() {
     existingMediaIdsToKeep: string[],
     newFiles: File[]
   ) => {
-    const updatedMem = await updateMemory(id, name, title, message, existingMediaIdsToKeep, newFiles);
-    await loadMemories();
-    setSelectedMemory(updatedMem);
+    await updateMemory(id, name, title, message, existingMediaIdsToKeep, newFiles);
+    try {
+      const data = await getMemories();
+      setUnsplitMemories(data);
+      const splitData = splitMemories(data);
+      setMemories(splitData);
+      
+      const newSelected = splitData.find(m => m.id === id || m.id.startsWith(id + '-split-'));
+      setSelectedMemory(newSelected || null);
+    } catch (err) {
+      console.error('Failed to reload memories after edit:', err);
+    }
     setMemoryToEdit(null);
   };
 
   // Delete memory Handler
   const handleDeleteMemory = async (id: string) => {
-    await deleteMemory(id);
+    const realId = id.includes('-split-') ? id.split('-split-')[0] : id;
+    await deleteMemory(realId);
     setSelectedMemory(null);
     setMemoryToEdit(null);
     await loadMemories();
@@ -89,7 +102,8 @@ function App() {
 
   // Add comment Handler
   const handleAddComment = async (memoryId: string, commenterName: string, commentMessage: string) => {
-    const newComment = await addCommentToMemory(memoryId, commenterName, commentMessage);
+    const realId = memoryId.includes('-split-') ? memoryId.split('-split-')[0] : memoryId;
+    const newComment = await addCommentToMemory(realId, commenterName, commentMessage);
     await loadMemories();
     return newComment;
   };
@@ -425,7 +439,9 @@ function App() {
         onClose={handleCloseDetail}
         onAddComment={handleAddComment}
         onEditTrigger={(mem) => {
-          setMemoryToEdit(mem);
+          const realId = mem.id.includes('-split-') ? mem.id.split('-split-')[0] : mem.id;
+          const originalMem = unsplitMemories.find(m => m.id === realId);
+          setMemoryToEdit(originalMem || mem);
         }}
       />
 

@@ -84,9 +84,6 @@ export const UploadDrawer: React.FC<UploadDrawerProps> = ({
   const [existingMedia, setExistingMedia] = useState<MemoryMedia[]>([]);
   const [mediaIdsToKeep, setMediaIdsToKeep] = useState<string[]>([]);
   
-  // Toggle for individual uploads
-  const [uploadAsIndividual, setUploadAsIndividual] = useState(false);
-
   const [dragActive, setDragActive] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -112,7 +109,6 @@ export const UploadDrawer: React.FC<UploadDrawerProps> = ({
         setMediaIdsToKeep([]);
         setFiles([]);
         setPreviewUrls([]);
-        setUploadAsIndividual(false);
       }
       setError(null);
     }
@@ -205,8 +201,8 @@ export const UploadDrawer: React.FC<UploadDrawerProps> = ({
       if (memoryToEdit) {
         await onEditSuccess(memoryToEdit.id, name.trim(), title.trim(), message.trim(), mediaIdsToKeep, compressedFiles);
       } else {
-        if (uploadAsIndividual && compressedFiles.length > 1) {
-          // Upload each file as an individual memory box!
+        // Always upload each file as an individual memory box!
+        if (compressedFiles.length > 1) {
           for (let i = 0; i < compressedFiles.length; i++) {
             const fileTitle = title.trim() ? `${title.trim()} (${i + 1})` : `Memory File ${i + 1}`;
             await onUploadSuccess(name.trim(), fileTitle, message.trim(), [compressedFiles[i]]);
@@ -519,36 +515,6 @@ export const UploadDrawer: React.FC<UploadDrawerProps> = ({
                 maxLength={1000}
               />
             </div>
-
-            {/* Individual uploads checkbox toggle */}
-            {!memoryToEdit && files.length > 1 && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                background: 'rgba(212, 175, 55, 0.05)',
-                border: '1px solid var(--border-glass-gold)',
-                padding: '10px 14px',
-                borderRadius: '10px',
-                fontSize: '0.82rem'
-              }}>
-                <input
-                  id="individual-toggle"
-                  type="checkbox"
-                  checked={uploadAsIndividual}
-                  onChange={(e) => setUploadAsIndividual(e.target.checked)}
-                  style={{
-                    accentColor: 'var(--color-gold)',
-                    width: '16px',
-                    height: '16px',
-                    cursor: 'pointer'
-                  }}
-                />
-                <label htmlFor="individual-toggle" style={{ cursor: 'pointer', color: 'var(--color-gold-light)', margin: 0, fontWeight: 500 }}>
-                  Create a separate memory box for each photo
-                </label>
-              </div>
-            )}
 
             {/* Actions Panel */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '10px' }}>
