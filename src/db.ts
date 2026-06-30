@@ -38,6 +38,46 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 export const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
+// Cloudinary Configuration
+const cloudinaryCloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || '';
+const cloudinaryUploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || '';
+
+async function uploadToCloudinary(file: File): Promise<{ url: string; type: 'image' | 'video' }> {
+  if (!cloudinaryCloudName || cloudinaryCloudName === 'your_cloud_name_here') {
+    throw new Error('Cloudinary is not configured. Please add VITE_CLOUDINARY_CLOUD_NAME to your .env file.');
+  }
+  if (!cloudinaryUploadPreset || cloudinaryUploadPreset === 'your_unsigned_preset_here') {
+    throw new Error('Cloudinary is not configured. Please add VITE_CLOUDINARY_UPLOAD_PRESET to your .env file.');
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', cloudinaryUploadPreset);
+
+  const isVideo = file.type.startsWith('video/');
+  const resourceType = isVideo ? 'video' : 'image';
+
+  const response = await fetch(
+    `https://api.cloudinary.com/v1_1/${cloudinaryCloudName}/${resourceType}/upload`,
+    {
+      method: 'POST',
+      body: formData,
+    }
+  );
+
+  if (!response.ok) {
+    const errText = await response.text();
+    console.error('Cloudinary upload error response:', errText);
+    throw new Error(`Cloudinary upload failed: ${response.statusText || errText}`);
+  }
+
+  const result = await response.json();
+  return {
+    url: result.secure_url || result.url,
+    type: isVideo ? 'video' : 'image'
+  };
+}
+
 const DB_NAME = 'EternalRemembranceDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'memories';
@@ -480,18 +520,13 @@ export async function addMemory(
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const mediaId = 'media-' + Math.random().toString(36).substr(2, 9) + '-' + i;
-      const path = `${id}/${mediaId}`;
-      const { error: uploadErr } = await supabase.storage.from('memories').upload(path, file, {
-        contentType: file.type,
-        upsert: true
-      });
-      if (uploadErr) throw uploadErr;
-
-      const { data: urlData } = supabase.storage.from('memories').getPublicUrl(path);
+      
+      const uploaded = await uploadToCloudinary(file);
+      
       mediaItems.push({
         id: mediaId,
-        type: file.type.startsWith('video/') ? 'video' : 'image',
-        url: urlData.publicUrl
+        type: uploaded.type,
+        url: uploaded.url
       });
     }
 
@@ -638,26 +673,25 @@ export async function updateMemory(
     // Delete removed files from storage
     for (const item of mediaToDelete) {
       const path = `${id}/${item.id}`;
-      await supabase.storage.from('memories').remove([path]);
+      try {
+        await supabase.storage.from('memories').remove([path]);
+      } catch (err) {
+        console.error("Failed to delete from Supabase storage (might be restricted):", err);
+      }
     }
 
-    // Upload new files
+    // Upload new files to Cloudinary
     const newMediaItems = [];
     for (let i = 0; i < newFiles.length; i++) {
       const file = newFiles[i];
       const mediaId = 'media-' + Math.random().toString(36).substr(2, 9) + '-' + i;
-      const path = `${id}/${mediaId}`;
-      const { error: uploadErr } = await supabase.storage.from('memories').upload(path, file, {
-        contentType: file.type,
-        upsert: true
-      });
-      if (uploadErr) throw uploadErr;
-
-      const { data: urlData } = supabase.storage.from('memories').getPublicUrl(path);
+      
+      const uploaded = await uploadToCloudinary(file);
+      
       newMediaItems.push({
         id: mediaId,
-        type: file.type.startsWith('video/') ? 'video' : 'image',
-        url: urlData.publicUrl
+        type: uploaded.type,
+        url: uploaded.url
       });
     }
 
@@ -746,7 +780,11 @@ export async function deleteMemory(id: string): Promise<void> {
       const media = memories[0].media || [];
       const pathsToDelete = media.map((m: any) => `${id}/${m.id}`);
       if (pathsToDelete.length > 0) {
-        await supabase.storage.from('memories').remove(pathsToDelete);
+        try {
+          await supabase.storage.from('memories').remove(pathsToDelete);
+        } catch (err) {
+          console.error("Failed to delete from Supabase storage (might be restricted):", err);
+        }
       }
     }
 
